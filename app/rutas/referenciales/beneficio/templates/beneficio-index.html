@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block titulo %}
+Beneficios
+{% endblock %}
+
+{% block contenido %}
+<div class="container mt-4">
+    <h3>Listar Beneficios</h3>
+
+    <!-- tarjeta -->
+    <div class="card">
+      <div class="card-header">
+        <button type="button" class="btn btn-primary" id="btnAgregar">Agregar</button>
+      </div>
+      <div class="card-body">
+        <table class="table table-striped" id="tbl">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Descripción</th>
+              <th>Duración</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+      </table>
+      </div>
+    </div>
+    <!-- /tarjeta -->
+
+    <!-- El formulario -->
+    <div class="modal" id="modalFormulario">
+      <!-- La clase modal-dialog-centered centra el modal -->
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+          <!-- Modal Header -->
+          <div class="modal-header">
+            <h4 class="modal-title" id="modalTitle"></h4>
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+          </div>
+
+          <!-- Modal body -->
+          <div class="modal-body">
+            <div class="form-group">
+              <input type="hidden" id="txtIdBeneficio">
+              <label for="txtNombre">Nombre:</label>
+              <input type="text" class="form-control" placeholder="Ingrese el nombre" id="txtNombre">
+              <label for="txtDescripcion">Descripción:</label>
+              <input type="text" class="form-control" placeholder="Ingrese la descripción" id="txtDescripcion">
+              <label for="txtDuracion">Duración:</label>
+              <input type="text" class="form-control" placeholder="Ingrese la duración" id="txtDuracion">
+            </div>
+          </div>
+
+          <!-- Modal footer -->
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="btnGuardar">Guardar</button>
+            <button type="button" class="btn btn-danger" data-dismiss="modal">Cerrar</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-4 d-none" id="rowAlerta">
+        <div class="col col-md-12">
+            <div class="alert alert-success">
+                <strong>Registro Exitoso!</strong>
+                <div class="row" id="mostrarAlerta"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+
+  const initDatatable = () => {
+    $('#tbl').DataTable({
+      language: {
+        url: "{{ url_for('static', filename='vendor/datatables/es-ES.json') }}",
+      },
+      ajax:'/api/v1/beneficios',  
+      columns: [
+        { data: 'nombre' },  
+        { data: 'descripcion' },
+        { data: 'duracion' },  
+        { data: function(row) {
+            return `<button type="button" name="btn_editar" class="btn btn-primary" data-id="${row.id}">Editar</button>
+                    <button type="button" name="btn_eliminar" class="btn btn-danger" data-id="${row.id}">Eliminar</button>`
+          }
+        }
+      ]
+    });
+  }
+
+  const agregar = () => {
+    $('#btnAgregar').on('click', function(){
+      // Setear un título a modal
+      $('#modalTitle').text("Agregar un Beneficio");
+      // inicia ventana modal
+      $('#txtIdBeneficio').val("");
+      $('#txtNombre').val("");  
+      $('#txtDescripcion').val("");
+      $('#txtDuracion').val("");  
+      $('#modalFormulario').modal();
+    });
+  }
+
+  const guardar = () => {
+    $('#btnGuardar').on('click', function() {
+      const idBeneficio = $('#txtIdBeneficio').val();  
+      const nuevoNombre = $('#txtNombre').val(); 
+      const nuevaDescripcion = $('#txtDescripcion').val();
+      const nuevaDuracion = $('#txtDuracion').val();  
+      const tabla = $('#tbl').DataTable();
+
+      if(idBeneficio) {
+        // update
+        fetch(`/api/v1/beneficios/${idBeneficio}`, {  
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          }, 
+          body: JSON.stringify({ nombre: nuevoNombre, descripcion: nuevaDescripcion, duracion: nuevaDuracion })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+          if(data && !data.error && data.success) {
+            tabla.ajax.reload();
+            Swal.fire("Actualizado", "El beneficio ha sido actualizado correctamente.", "success");
+          } else {
+            Swal.fire(data.error);
+          }
+        }).catch(err => {
+          console.error(err);
+          Swal.fire("Error", "Ocurrió un error al actualizar el beneficio.", "error");
+        });
+      } else {
+        // insert
+        fetch(`/api/v1/beneficios`, {  
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }, 
+          body: JSON.stringify({ nombre: nuevoNombre, descripcion: nuevaDescripcion, duracion: nuevaDuracion })  
+        })
+        .then(resp => resp.json())
+        .then(data => {
+          if(data && !data.error && data.success) {
+            tabla.ajax.reload();
+            Swal.fire("Registrado", "El beneficio ha sido agregado correctamente.", "success");
+          } else {
+            Swal.fire(data.error);
+          }
+        }).catch(err => {
+          console.error(err);
+          Swal.fire("Error", "Ocurrió un error al guardar el beneficio.", "error");
+        });
+      }
+      $('#txtNombre').val("");  
+      $('#txtDescripcion').val("");
+      $('#txtDuracion').val("");  
+      $('#modalFormulario').modal("hide");
+    });
+  }
+
+  const editar = () => {
+    $('#tbl').on('click', 'button[name="btn_editar"]',function(){
+      // Mostrar mensaje de confirmación usando sweetalert
+      Swal.fire({
+        title: "¿Deseas editar este registro?",
+        showCancelButton: true,
+        confirmButtonText: "Si",
+        cancelButtonText: `No`
+      }).then((result) => {
+        if (result.isConfirmed) {
+          $('#modalTitle').text("Editar un Beneficio");
+
+          const idBeneficio = $(this).data('id');  
+          $('#txtIdBeneficio').val(idBeneficio); 
+
+          // Obtener los datos del beneficio del backend
+          fetch(`/api/v1/beneficios/${idBeneficio}`, {  
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+          .then(resp => resp.json())
+          .then(data => {
+            $('#txtNombre').val(data.data.nombre);  
+            $('#txtDescripcion').val(data.data.descripcion);
+            $('#txtDuracion').val(data.data.duracion);  
+            $('#modalFormulario').modal();
+          });
+        }
+      });
+    });
+  }
+
+  const eliminar = () => {
+    $('#tbl').on('click', 'button[name="btn_eliminar"]',function(){
+      const idBeneficio = $(this).data('id');  
+      // Mostrar mensaje de confirmación usando sweetalert
+      Swal.fire({
+        title: "¿Deseas eliminar este registro?",
+        showCancelButton: true,
+        confirmButtonText: "Si",
+        cancelButtonText: `No`
+      }).then((result) => {
+        if (result.isConfirmed) {
+          fetch(`/api/v1/beneficios/${idBeneficio}`, {  
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+          .then(resp => resp.json())
+          .then(data => {
+            if(data && !data.error && data.success) {
+              // Borrar la fila del datatable
+              const fila =$(this).closest('tr');
+              const tabla = $('#tbl').DataTable();
+              tabla.row(fila).remove().draw();
+              Swal.fire("Eliminado", "", data.success);
+            } else {
+              Swal.fire(data.error);
+            }
+          }).catch(err => {
+            Swal.fire("Error", "Ocurrió un error al eliminar el beneficio.", "error");
+          });
+        }
+      });
+    });
+  }
+
+  $(document).ready(function() {
+    initDatatable();
+    agregar();
+    guardar();
+    editar();
+    eliminar();
+  });
+
+</script>
+{% endblock %}
